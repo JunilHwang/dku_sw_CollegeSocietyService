@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Document</title>
+	<script src="/static/js/jquery-1.12.3.min.js"></script>
+	<script src="/static/js/vue.min.js"></script>
+</head>
+<body>
+<div id="app">
+	<board-list v-if="bus.page == 'list'"></board-list>
+	<board-write v-if="bus.page == 'write'"></board-write>
+</div>
+<script type="text/x-template" id="boardList">
+	<div>
+		<table width="800px">
+			<colgroup>
+				<col width="10%" />
+				<col width="60%" />
+				<col width="15%" />
+				<col width="15%" />
+			</colgroup>
+			<thead>
+				<tr>
+					<th>번호</th>
+					<th>제목</th>
+					<th>작성자</th>
+					<th>작성일</th>
+				</tr>
+			</thead>
+			<tbody>
+				<tr>
+				</tr>
+			</tbody>
+		</table>
+		<a href="#" @click="bus.page = 'write'">글작성</a>
+	</div>
+</script>
+<script type="text/x-template" id="boardWrite">
+	<div>
+		<form action="" method="post" @submit="boardInsert">
+			<fieldset><legend>글작성</legend>
+				<ul>
+					<li>
+						<label>
+							작성자
+							<input type="text" name="name" size="20" autofocus>
+						</label>
+					</li>
+					<li>
+						<label>
+							제목
+							<input type="text" name="subject" size="80">
+						</label>
+					</li>
+					<li>
+						<label>
+							내용
+							<input type="text" name="content" size="80">
+						</label>
+					</li>
+				</ul>
+				<button type="submit">전송</button>
+			</fieldset>
+		</form>
+	</div>
+</script>
+<script>
+var resturl = "http://127.0.0.1:5000"
+Vue.component('board-list',{
+	template:"#boardList"
+})
+Vue.component('board-write',{
+	template:"#boardWrite",
+	methods:{
+		boardInsert:boardInsert
+	}
+})
+var bus = new Vue({
+	data:{
+		page:'list'
+	}
+})
+var app = new Vue({
+	el: '#app'
+})
+$(document).on("click","a[href='#']",function(){ return false;})
+
+function boardInsert(event){
+	event.preventDefault();
+	var frm = event.target;
+	$.ajax({
+		type:'post',
+		url:resturl+"/boardInsert",
+		data:$(frm).serialize(),
+		success:function(data){
+			data = JSON.parse(data);
+			if(data.lastid){
+				alert('추가되었습니다.')
+				bus.page = 'list'
+			}
+		}
+	})
+}
+</script>
+</body>
+</html>
