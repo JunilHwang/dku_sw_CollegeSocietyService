@@ -1,0 +1,28 @@
+<div>
+	<form action="" method="post" @submit="insert">
+		<fieldset><legend>글작성</legend>
+			<ul>
+				<li>
+					<label>
+						작성자
+						<input type="text" name="name" size="20" autofocus>
+					</label>
+				</li>
+				<li>
+					<label>
+						제목
+						<input type="text" name="subject" size="80">
+					</label>
+				</li>
+				<li>
+					<label>
+						내용
+						<input type="text" name="content" size="80">
+					</label>
+				</li>
+			</ul>
+			<button type="submit">전송</button>
+			<button type="button" @click="bus.page='list'">취소</button>
+		</fieldset>
+	</form>
+</div>

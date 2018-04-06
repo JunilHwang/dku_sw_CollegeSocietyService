@@ -1,0 +1,23 @@
+<div>
+	<ul>
+		<li>
+			<strong>작성자</strong>
+			<p v-html="bus.getData.name"></p>
+		</li>
+		<li>
+			<strong>제목</strong>
+			<p v-html="bus.getData.subject"></p>
+		</li>
+		<li>
+			<strong>내용</strong>
+			<p v-html="bus.getData.content"></p>
+		</li>
+		<li>
+			<strong>작성일</strong>
+			<p v-html="getDateFormat(bus.getData.date)"></p>
+		</li>
+	</ul>
+	<a href="#" @click="setList">목록</a>
+	<a href="#" @click="setUpdate">수정</a>
+	<a href="#" @click="setDelete">삭제</a>
+</div>

@@ -1,0 +1,27 @@
+<div>
+	<table width="800px">
+		<colgroup>
+			<col width="10%" />
+			<col width="60%" />
+			<col width="15%" />
+			<col width="15%" />
+		</colgroup>
+		<thead>
+			<tr>
+				<th>번호</th>
+				<th>제목</th>
+				<th>작성자</th>
+				<th>작성일</th>
+			</tr>
+		</thead>
+		<tbody v-if="list != null">
+			<tr v-for="data in list">
+				<td v-html="data.idx"></td>
+				<td><a href="#" v-html="data.subject" @click="setView(data)"></a></td>
+				<td v-html="data.name"></td>
+				<td v-html="getDateFormat(data.date)"></td>
+			</tr>
+		</tbody>
+	</table>
+	<a href="#" @click="bus.page = 'write'">글작성</a>
+</div>
