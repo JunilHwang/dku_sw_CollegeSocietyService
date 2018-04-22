@@ -20,18 +20,90 @@ cursor = None
 def getCursor() :
 	global con, cursor
 	con = pymysql.connect(
-		host='localhost',	# DB HOST
-		user='root', 		# DB USER
-		password='nif',     # DB PW
-		db='20180403',		# DB NAME
-		autocommit=True, 	# python은 query 실행 후 commit을 해줘야 하는데, 이렇게 지정하면 자동으로 해줌
-		charset='utf8'		# 문자열 세팅은 utf8로
-	)
+		host='220.149.235.59',	# DB HOST
+		user='root', 			# DB USER
+		password='14959',     	# DB PW
+		db='dkswcm',			# DB NAME
+		autocommit=True, 		# python은 query 실행 후 commit을 해줘야 하는데, 이렇게 지정하면 자동으로 해줌
+		charset='utf8')
 	cursor = con.cursor(pymysql.cursors.DictCursor)	 # 전역변수로 커서 생성, DictCursor : 결과를 dictionary 형태로 받아옴
 
 # DB 연결 종료
 def closeCon() :
 	con.close()
+
+# 회원 추가
+@app.route("/member", methods=['POST'])
+def memberInsert() :
+	_id = request.form['id']
+	_pw = request.form['pw']
+	_name = request.form['name']
+	_nickname = request.form['nickname']
+	_email = request.form['email']
+	_undergrad_number = request.form['undergrad_number']
+	getCursor()
+	sql = 'SELECT count(*) as cnt from member where id=%s'
+	cursor.execute(sql,(_id))
+	data = cursor.fetchone()
+	print data
+	if data.get('cnt') > 0 :
+		return "false"
+	sql = '''
+		INSERT INTO member SET
+		id=%s,
+		pw=%s,
+		name=%s,
+		nickname=%s,
+		email=%s,
+		undergrad_number=%s,
+		collage='단국대학교',
+		major='소프트웨어학과',
+		regdate=now()
+	'''
+	cursor.execute(sql,(_id,_pw,_name,_nickname,_email,_undergrad_number))
+	lastid = cursor.lastrowid
+	closeCon()
+	return "true"
+
+# 회원 정보 변경
+@app.route("/member/<idx>", methods=['PUT'])
+def memberUpdate(idx) :
+	getCursor()
+	if not request.form['pw'] :
+		_name = request.form['name']
+		_nickname = request.form['nickname']
+		_email = request.form['email']
+		sql = '''
+			UPDATE member SET
+			name=%s,
+			nickname=%s,
+			email=%s
+			where idx = %s
+		'''
+		_list = (_name,_nickname,_email,idx)
+	else :
+		_pw = request.form['pw']
+		sql = '''
+			UPDATE member SET
+			pw=%s
+			where idx = %s
+		'''
+		_list = (_pw,idx)
+	cursor.execute(sql,_list)
+	closeCon()
+	return "true"
+
+# 로그인
+@app.route("/login", methods=['POST'])
+def memberLogin() :
+	_id = request.form['id']
+	_pw = request.form['pw']
+	sql = 'SELECT * FROM member WHERE id=%s and pw=%s'
+	getCursor()
+	cursor.execute(sql,(_id,_pw))
+	data = cursor.fetchone()
+	print data
+	return json.dumps(data)
 
 # 메인페이지
 @app.route("/")
