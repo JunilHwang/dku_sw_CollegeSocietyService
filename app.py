@@ -5,7 +5,7 @@
 # json : string to json
 # pymysql : python mysql
 # CORS : 외부 포트 접근 허용
-from flask import Flask, render_template,request,json
+from flask import Flask, render_template,json,request
 from flask_cors import CORS
 import pymysql
 
@@ -105,21 +105,27 @@ def memberLogin() :
 	print data
 	return json.dumps(data)
 
-# 메인페이지
-@app.route("/")
-def main() :
-	# 렌더링 페이지 지정
-	return render_template("index.html")
-
-# 게시물 목록
-@app.route("/boardList")
-def boardList() :
+# 카테고리 목록
+@app.route("/categoryList", methods=['GET'])
+def categoryList() :
 	# list 쿼리문
-	sql = "SELECT * FROM board order by `date` desc";
+	sql = "SELECT * FROM category order by idx asc";
 	getCursor()	# DB 연결
 	cursor.execute(sql) # 쿼리문 실행
 	data = cursor.fetchall() # 실행 결과 목록 가져오기
 	closeCon() # 연결 종료
+	return json.dumps(data) # 실행 결과를 json으로 반환
+
+# 게시물 목록
+@app.route("/boardList/<category>", methods=["GET"])
+def boardList(category) :
+	# list 쿼리문
+	sql = "SELECT * FROM board where category=%s order by `reg_date` desc";
+	getCursor()	# DB 연결
+	cursor.execute(sql,(category)) # 쿼리문 실행
+	data = cursor.fetchall() # 실행 결과 목록 가져오기
+	closeCon() # 연결 종료
+	return "boardList" # 실행 결과를 json으로 반환
 	return json.dumps(data) # 실행 결과를 json으로 반환
 	
 # boardInsert 접근시 게시물 추가 후 추가된 index값 반환
@@ -168,4 +174,4 @@ def boardDelete(idx) :
 	return "true"
 
 if __name__ == "__main__" : 
-	app.run(host='0.0.0.0');
+	app.run(host='0.0.0.0',debug=True,threaded=True);
