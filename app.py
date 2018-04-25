@@ -125,24 +125,34 @@ def boardList(category) :
 	cursor.execute(sql,(category)) # 쿼리문 실행
 	data = cursor.fetchall() # 실행 결과 목록 가져오기
 	closeCon() # 연결 종료
-	return "boardList" # 실행 결과를 json으로 반환
+	#return "boardList" # 실행 결과를 json으로 반환
 	return json.dumps(data) # 실행 결과를 json으로 반환
 	
 # boardInsert 접근시 게시물 추가 후 추가된 index값 반환
-@app.route("/boardInsert", methods=['POST'])
-def boardInsert() :
-	_name = request.form['name']		# 사용자가 입력한 name 값
+@app.route("/board/<category>", methods=['POST'])
+def boardInsert(category) :
+	_writer = request.form['writer']		# 사용자가 입력한 name 값
 	_subject = request.form['subject']	# 사용자가 입력한 subject 값
 	_content = request.form['content']	# 사용자가 입력한 content 값
-	sql = "INSERT INTO board SET name=%s, subject=%s, content=%s, date=now();" # query문 작성0
+	sql = '''
+		INSERT INTO board SET
+		-- parent=0,
+		-- od=0,
+		-- depth=0,
+		subject=%s,
+		writer=%s,
+		content=%s,
+		reg_date=now(),
+		category=%s;
+	''' # query문 작성
 	getCursor()	# DB 연결
-	cursor.execute(sql,(_name,_subject,_content))	# 각 %s를 _name, _subject, _content로 치환
+	cursor.execute(sql,(_subject,_writer,_content,category))	# 각 %s를 _name, _subject, _content로 치환
 	lastid = cursor.lastrowid	# 추가된 데이터의 index 값
 	closeCon()	# DB 연결 종료
 	return json.dumps({"lastid":lastid})	# index값 반환
 
 # /boardView 접근시 해당 게시물 데이터 반환
-@app.route("/boardView/<idx>")
+@app.route("/board/<idx>", methods=['GET'])
 def boardView(idx) :
 	sql = "SELECT * FROM board where idx=%s";
 	getCursor();
@@ -152,20 +162,19 @@ def boardView(idx) :
 	return json.dumps(data)
 
 # /boardUpdate 접근시 해당 게시물 데이터 업데이트 및 반환
-@app.route("/boardUpdate/<idx>", methods=['POST'])
+@app.route("/board/<idx>", methods=['PUT'])
 def boardUpdate(idx) :
-	_name = request.form['name']
 	_subject = request.form['subject']
 	_content = request.form['content']
-	sql = "UPDATE board SET name=%s, subject=%s, content=%s where idx=%s;"
+	sql = "UPDATE board SET subject=%s, content=%s where idx=%s;"
 	getCursor()
-	cursor.execute(sql,(_name,_subject,_content,idx))
+	cursor.execute(sql,(_subject,_content,idx))
 	closeCon()
-	return boardView(idx)	# 수정된 데이터 반환
+	return "true"	# 수정된 데이터 반환
 
 
 # 게시물 삭제
-@app.route("/boardDelete/<idx>")
+@app.route("/board/<idx>", methods=['DELETE'])
 def boardDelete(idx) :
 	sql = "DELETE FROM board where idx=%s"
 	getCursor()
