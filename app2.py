@@ -14,3 +14,5 @@ def create_app(config_filename):    #init flask app then return
     api.init_app(app)
 
     return app
+
+app=create_app('config')    #read settings from config.py

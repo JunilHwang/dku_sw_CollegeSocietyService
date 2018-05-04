@@ -1,8 +1,8 @@
 #run.py
 #run server
 
-from app2 import create_app
-app=create_app('config')    #read settings from config.py
+from app2 import app
+import views
 
 if __name__=='__main__':
     app.run(host=app.config['HOST']),
