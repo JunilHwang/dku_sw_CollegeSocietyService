@@ -7,13 +7,21 @@ db=SQLAlchemy()
 
 class AddUpdateDelete():
     def add(self,resource):
-        db.session.add(resource)
-        return db.session.commit()
+        try:
+            db.session.add(resource)
+            return db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            return str(e)
     def update(self):
         return db.session.commit()
     def delete(self,resource):
-        db.session.delete(resource)
-        return db.session.commit()
+        try:
+            db.session.delete(resource)
+            return db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            return str(e)
 
 class member(db.Model, AddUpdateDelete):
     index=db.Column('idx',db.Integer, primary_key=True)
