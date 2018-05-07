@@ -7,21 +7,13 @@ db=SQLAlchemy()
 
 class AddUpdateDelete():
     def add(self,resource):
-        try:
-            db.session.add(resource)
-            return db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            return str(e)
+        db.session.add(resource)
+        return db.session.commit()
     def update(self):
         return db.session.commit()
     def delete(self,resource):
-        try:
-            db.session.delete(resource)
-            return db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            return str(e)
+        db.session.delete(resource)
+        return db.session.commit()
 
 class member(db.Model, AddUpdateDelete):
     index=db.Column('idx',db.Integer, primary_key=True)
@@ -36,8 +28,7 @@ class member(db.Model, AddUpdateDelete):
     regdate=db.Column(db.TIMESTAMP, server_default=db.func.current_timestamp(), nullable=False)
     level=db.Column(db.Integer)
 
-    def __init__(self,index,id,pw,name,college,major,st_num,email,nickname,regdate,level):
-        self.index=index
+    def __init__(self,id,pw,name,college,major,st_num,email,nickname):
         self.id=id
         self.pw=pw
         self.name=name
@@ -46,8 +37,6 @@ class member(db.Model, AddUpdateDelete):
         self.st_num=st_num
         self.email=email
         self.nickname=nickname
-        self.regdate=regdate
-        self.level=level
         
 class board(db.Model,AddUpdateDelete):
     index=db.Column('idx', db.Integer, primary_key=True)
