@@ -51,8 +51,7 @@ class board(db.Model,AddUpdateDelete):
     hit=db.Column(db.Integer)
     goods=db.Column(db.Integer)
 
-    def __init__(self,index,category,writer,parent,od,depth,subject,content,reg_date,hit,goods):
-        self.index=index
+    def __init__(self,category,writer,parent,od,depth,subject,content):
         self.category=category
         self.writer=writer
         self.parent=parent
@@ -60,9 +59,6 @@ class board(db.Model,AddUpdateDelete):
         self.depth=depth
         self.subject=subject
         self.content=content
-        self.reg_date=reg_date
-        self.hit=hit
-        self.goods=goods
 
 class category(db.Model,AddUpdateDelete):
     index=db.Column('idx', db.Integer, primary_key=True)
@@ -83,14 +79,12 @@ class comment(db.Model,AddUpdateDelete):
     content=db.Column(db.TEXT, nullable=False)
     date=db.Column(db.TIMESTAMP, server_default=db.func.current_timestamp(), nullable=False)
 
-    def __init__(self,index,board_idx,writer,od,depth,content,date):
-        self.index=index
+    def __init__(self,board_idx,writer,od,depth,content):
         self.board_idx=board_idx
         self.writer=writer
         self.od=od
         self.depth=depth
         self.content=content
-        self.date=date
 
 class cms(db.Model,AddUpdateDelete):
     index=db.Column('idx', db.Integer, primary_key=True)
@@ -106,13 +100,13 @@ class cms(db.Model,AddUpdateDelete):
         self.withdraw=withdraw
         self.date=date
 
-#class meta_data(db.Model, AddUpdateDelete):
-#    key=db.Column(db.String(20))
-#    value=db.Column(db.TEXT)
-#
-#    def __init__(self, key, value):
-#        self.key=key
-#        self.value=value
+class meta_data(db.Model, AddUpdateDelete):
+    key=db.Column(db.String(20), primary_key=True)
+    value=db.Column(db.TEXT)
+
+    def __init__(self, key, value):
+        self.key=key
+        self.value=value
 
 class files(db.Model, AddUpdateDelete):
     index=db.Column('idx', db.Integer, primary_key=True)
