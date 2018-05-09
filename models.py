@@ -16,28 +16,34 @@ class AddUpdateDelete():
         return db.session.commit()
 
 class member(db.Model, AddUpdateDelete):
-    index=db.Column('idx',db.Integer, primary_key=True)
+    idx=db.Column(db.Integer, primary_key=True)
     id=db.Column(db.String(16), unique=True, nullable=False)
     pw=db.Column(db.String(255), nullable=False)
     name=db.Column(db.String(20), nullable=False)
     college=db.Column(db.String(20), nullable=False)
     major=db.Column(db.String(20), nullable=False)
-    st_num=db.Column('undergrad_number',db.Integer, nullable=False)
+    undergrad_number=db.Column(db.Integer, nullable=False)
     email=db.Column(db.String(30), nullable=False)
     nickname=db.Column(db.String(20))
     regdate=db.Column(db.TIMESTAMP, server_default=db.func.current_timestamp(), nullable=False)
-    level=db.Column(db.Integer)
+    level=db.Column(db.Integer, default=1)
 
-    def __init__(self,id,pw,name,college,major,st_num,email,nickname):
+    def __init__(self,id,pw,name,college,major,undergrad_number,email,nickname):
         self.id=id
         self.pw=pw
         self.name=name
         self.college=college
         self.major=major
-        self.st_num=st_num
+        self.undergrad_number=undergrad_number
         self.email=email
-        self.nickname=nickname
-        
+        if nickname:
+            self.nickname=nickname
+        else:
+            self.nickname=id
+
+    def as_dict(self):
+       return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
 class board(db.Model,AddUpdateDelete):
     index=db.Column('idx', db.Integer, primary_key=True)
     category=db.Column(db.Integer, nullable=False)

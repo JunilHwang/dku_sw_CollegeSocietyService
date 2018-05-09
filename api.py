@@ -29,37 +29,30 @@ class UserResource(Resource):
         _email=args['email']
         _nickname=args['nickname']
         
-        '''
         try:
             new_member=member(_id,_pw,_name,_college,_major,_undergrad,_email,_nickname)
             new_member.add(new_member)
-            추가 됐는지 조회 후, 결과, code201 리턴할 것
 
         except SQLAlchemyError as e:
             db.session.rollback()
-            resp=jsonify({"error":str(e)})
+            resp={"error":str(e)}
             return resp, status.HTTP_400_BAD_REQUEST
-        '''
-        #db연동 확인후 아래 리턴문은 삭제
-        return {'id':_id,
-                'pw':_pw,
-                'name':_name,
-                'college':_college,
-                'major':_major,
-                'undergrad_number':_undergrad,
-                'email':_email,
-                'nickname':_nickname}, status.HTTP_201_CREATED
+        query=member.query.get(new_member.idx)
+        result=query.as_dict()
+        del result['regdate']
+        return result, status.HTTP_201_CREATED
 
 class ProfileResource(Resource):
     def get(self,idx): #show user info
-        pass
-        #current_user=member.query.get_or_404(idx)
-        #query to json
-        #return
+        current_user=member.query.get_or_404(idx)
+        result=current_user.as_dict()
+        del result['regdate']
+        return result
 
     def patch(self, idx): #edit user info
         current_user=member.query.get_or_404(idx)
 
+        parser=reqparse.RequestParser()
         #parsing list중 필요없는것 삭제할 것
         parser.add_argument('id', type=str, location='form')
         parser.add_argument('pw', type=str, location='form')
@@ -95,15 +88,15 @@ class ProfileResource(Resource):
             return self.get(idx)
         except SQLAlchemyError as e:
             db.session.rollback()
-            resp=nsonify({"error":str(e)})
+            resp={"error":str(e)}
             return resp,status.HTTP_400_BAD_REQUEST
 
     def delete(self,idx):
         current_user=member.query.get_or_404(idx)
         try:
             current_user.delete(current_user)
-            response=make_response()
-            return response, status.HTTP_204_NO_CONTENT
+            resp={"status":"success"}
+            return resp, status.HTTP_204_NO_CONTENT
         except SQLAlchemyError as e:
             db.session.rollback()
             resp=jsonify({"error":str(e)})
@@ -164,11 +157,11 @@ class PostResource(Resource):
         current_post=board.query.get_or_404(idx)
 
         parser=reqparse.RequestParser()
-        parser.add_argument('category', type=int, required=True)
-        parser.add_argument('writer', type=int, required=True)
-        parser.add_argument('parent', type=int, required=True)
-        parser.add_argument('od', type=int, required=True)
-        parser.add_argument('depth', type=int, required=True)
+        parser.add_argument('category', type=int)
+        parser.add_argument('writer', type=int)
+        parser.add_argument('parent', type=int)
+        parser.add_argument('od', type=int)
+        parser.add_argument('depth', type=int)
         parser.add_argument('subject', type=str, required=True)
         parser.add_argument('content', type=str, required=True)
         args=parser.parse_args()
@@ -182,7 +175,8 @@ class PostResource(Resource):
         _content=args['content']
 
         try:
-            #input parameter check
+            current_post.subject=args['subject']
+            current_post.content=args['content']
             current_post.session.update()
         except SQLAlchemyError as e:
             db.session.rollback()
@@ -240,26 +234,20 @@ class CommentListResource(Resource):
                 'content':_content}, status.HTTP_201_CREATED
 
 class CommentResource(Resource):
-    def patch(self,comment_idx): #edit comment
+    def put(self,comment_idx): #edit comment
         current_comment=comment.query.get_or_404(comment_idx)
         
         parser=reqparse.RequestParser()
-        parser.add_argument('bidx', type=int, required=True)
-        parser.add_argument('writer', type=int, required=True)
-        parser.add_argument('od', type=int, required=True)
-        parser.add_argument('depth', type=int, required=True)
+        parser.add_argument('bidx', type=int)
+        parser.add_argument('writer', type=int)
+        parser.add_argument('od', type=int)
+        parser.add_argument('depth', type=int)
         parser.add_argument('content', type=str, required=True)
         args=parser.parse_args()
 
-        _bidx=args['bidx']
-        _writer=args['writer']
-        _od=args['od']
-        _depth=['depth']
-        _content=['content']
-
         try:
-            #input parameter check
-            current_post.session.update()
+            current_comment.content=args['content']
+            current_comment.session.update()
         except SQLAlchemyError as e:
             db.session.rollback()
             resp=nsonify({"error":str(e)})
