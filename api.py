@@ -1,5 +1,13 @@
 #api.py
+'''
+<To Do List> - 18.05.10
+update,delete시 무결성 제약조건 추가(models.py)
+relation확인(models.py)
+mysql datetime을 json에 value로 넣을 방법
+request parser, return json에서 필요한 필드만 남기고 삭제
 
+cms,meta_data,file 테이블에 대한 api추가
+'''
 from flask import jsonify, make_response
 from flask_restful import Api,Resource,reqparse
 from models import *
@@ -41,6 +49,14 @@ class UserResource(Resource):
         result=query.as_dict()
         del result['regdate']
         return result, status.HTTP_201_CREATED
+   
+    def get(self):
+        query=member.query.all()
+        result=many_returns(query)
+        for x in result:
+            del x['regdate']
+        return result
+
 
 class ProfileResource(Resource):
     def get(self,idx): #show user info
@@ -104,10 +120,12 @@ class ProfileResource(Resource):
 
 class BoardResource(Resource):
     def get(self): #show list of post
-        pass
-        #posts=board.query.all()
-        #query to json
-        #return
+        posts=board.query.all()
+        result=many_returns(query)
+        for x in result:
+            del x['reg_date']
+        return result
+
     def post(self): #add new post board
         parser=reqparse.RequestParser()
         parser.add_argument('category', type=int, required=True)
@@ -126,32 +144,27 @@ class BoardResource(Resource):
         _depth=args['depth']
         _subject=args['subject']
         _content=args['content']
-        '''
+        
         try:
-            new_post=member(_category,_writer,_parent,_od,_major,_depth,_subject,_content)
+            new_post=board(_category,_writer,_parent,_od,_major,_depth,_subject,_content)
             new_post.add(new_post)
-            추가 됐는지 조회 후, 결과, code201 리턴할 것
 
         except SQLAlchemyError as e:
             db.session.rollback()
             resp=jsonify({"error":str(e)})
             return resp, status.HTTP_400_BAD_REQUEST
-        '''
-        #db연동 확인후 아래 리턴문은 삭제
-        return {'category':_category,
-                'writer':_writer,
-                'parent':_parent,
-                'od':_od,
-                'depth':_depth,
-                'subject':_subject,
-                'content':_content}, status.HTTP_201_CREATED
+
+        query=board.query.get(new_post.idx)
+        result=query.as_dict()
+        del result['reg_date']
+        return result, status.HTTP_201_CREATED
 
 class PostResource(Resource):
     def get(self,idx): #show content of post
-        pass
-        #post=board.query.get_or_404(idx)
-        #query to json
-        #return
+        current_post=board.query.get_or_404(idx)
+        result=current_post.as_dict()
+        del result['reg_date']
+        return result
 
     def patch(self,idx): #edit post
         current_post=board.query.get_or_404(idx)
@@ -196,10 +209,9 @@ class PostResource(Resource):
 
 class CommentListResource(Resource):
     def get(self,idx):  #show comment list of the post
-        pass
-        #comments=comment.query.flter_by().all()
-        #query to json
-        #return
+        comments=comment.query.filter_by(idx).all()
+        result=many_returns(comments)
+        return result
 
     def post(self,idx): #add new comment on post
         parser=reqparse.RequestParser()
@@ -215,23 +227,19 @@ class CommentListResource(Resource):
         _od=args['od']
         _depth=['depth']
         _content=['content']
-        '''
+        
         try:
             new_comment=member(_bidx,_writer,_od,_depth,_content)
             new_comment.add(new_comment)
-            추가 됐는지 조회 후, 결과, code201 리턴할 것
 
         except SQLAlchemyError as e:
             db.session.rollback()
             resp=jsonify({"error":str(e)})
             return resp, status.HTTP_400_BAD_REQUEST
-        '''
-        #db연동 확인후 아래 리턴문은 삭제
-        return {'bidx':_bidx,
-                'writer':_writer,
-                'od':_od,
-                'depth':_depth,
-                'content':_content}, status.HTTP_201_CREATED
+        
+        query=comment.query.get(new_comment.idx)
+        result=query.as_dict()
+        return result, status.HTTP_201_CREATED
 
 class CommentResource(Resource):
     def put(self,comment_idx): #edit comment

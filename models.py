@@ -5,6 +5,12 @@ from flask_sqlalchemy import SQLAlchemy
 
 db=SQLAlchemy()
 
+def many_returns(query):
+    tuple_list=[]
+    for tuple in query:
+        tuple_list.append(tuple.as_dict())
+    return tuple_list
+
 class AddUpdateDelete():
     def add(self,resource):
         db.session.add(resource)
@@ -14,6 +20,8 @@ class AddUpdateDelete():
     def delete(self,resource):
         db.session.delete(resource)
         return db.session.commit()
+    def as_dict(self):
+       return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
 class member(db.Model, AddUpdateDelete):
     idx=db.Column(db.Integer, primary_key=True)
@@ -41,11 +49,8 @@ class member(db.Model, AddUpdateDelete):
         else:
             self.nickname=id
 
-    def as_dict(self):
-       return {c.name: getattr(self, c.name) for c in self.__table__.columns}
-
 class board(db.Model,AddUpdateDelete):
-    index=db.Column('idx', db.Integer, primary_key=True)
+    idx=db.Column(db.Integer, primary_key=True)
     category=db.Column(db.Integer, nullable=False)
     writer=db.Column(db.Integer, db.ForeignKey('member.idx'), nullable=False)
     parent=db.Column(db.Integer)
@@ -67,12 +72,11 @@ class board(db.Model,AddUpdateDelete):
         self.content=content
 
 class category(db.Model,AddUpdateDelete):
-    index=db.Column('idx', db.Integer, primary_key=True)
+    idx=db.Column(db.Integer, primary_key=True)
     name=db.Column(db.String(20),nullable=False)
     skin=db.Column(db.String(50))
 
-    def __init__(self,index,name,skin):
-        self.index=index
+    def __init__(self,name,skin):
         self.name=name
         self.skin=skin
 
@@ -93,14 +97,13 @@ class comment(db.Model,AddUpdateDelete):
         self.content=content
 
 class cms(db.Model,AddUpdateDelete):
-    index=db.Column('idx', db.Integer, primary_key=True)
+    idx=db.Column(db.Integer, primary_key=True)
     content=db.Column(db.VARCHAR(255))
     deposit=db.Column(db.Integer)
     withdraw=db.Column(db.Integer)
     date=db.Column(db.DATE)
 
-    def __init__(self,index,content,deposit,withdraw,date):
-        self.index=index
+    def __init__(self,content,deposit,withdraw,date):
         self.content=content
         self.deposit=deposit
         self.withdraw=withdraw
@@ -115,18 +118,16 @@ class meta_data(db.Model, AddUpdateDelete):
         self.value=value
 
 class files(db.Model, AddUpdateDelete):
-    index=db.Column('idx', db.Integer, primary_key=True)
+    idx=db.Column(db.Integer, primary_key=True)
     table=db.Column(db.String(20))
     id=db.Column(db.Integer)
     origin_name=db.Column(db.VARCHAR(255))
     file_name=db.Column(db.String(50))
     reg_date=db.Column(db.TIMESTAMP)
 
-    def __init__(self,index,table,id,origin_name,file_name,reg_date):
-        self.index=index
+    def __init__(self,table,id,origin_name,file_name,reg_date):
         self.table=table
         self.id=id
         self.origin_name=origin_name
         self.file_name=file_name
         self.reg_date=reg_date
-
