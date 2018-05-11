@@ -1,12 +1,10 @@
 #api.py
 '''
-<To Do List> - 18.05.10
-update,delete시 무결성 제약조건 추가(models.py)
-relation확인(models.py)
-mysql datetime을 json에 value로 넣을 방법
-request parser, return json에서 필요한 필드만 남기고 삭제
-
+<To Do List> - 18.05.11
+user입력,변경시 validation추가
 cms,meta_data,file 테이블에 대한 api추가
+http인증
+파일처리(?)
 '''
 from flask import jsonify, make_response
 from flask_restful import Api,Resource,reqparse
@@ -44,26 +42,26 @@ class UserResource(Resource):
         except SQLAlchemyError as e:
             db.session.rollback()
             resp={"error":str(e)}
-            return resp, status.HTTP_400_BAD_REQUEST
+            return jsonify(resp), status.HTTP_400_BAD_REQUEST
         query=member.query.get(new_member.idx)
         result=query.as_dict()
-        del result['regdate']
-        return result, status.HTTP_201_CREATED
+
+        return jsonify(result), status.HTTP_201_CREATED
    
-    def get(self):
+    def get(self):      #show all users
         query=member.query.all()
         result=many_returns(query)
         for x in result:
-            del x['regdate']
-        return result
+            x['regdate']=str(x['regdate'])
+        return jsonify(result)
 
 
 class ProfileResource(Resource):
     def get(self,idx): #show user info
         current_user=member.query.get_or_404(idx)
         result=current_user.as_dict()
-        del result['regdate']
-        return result
+        result['regdate']=str(result['regdate'])
+        return jsonify(result)
 
     def patch(self, idx): #edit user info
         current_user=member.query.get_or_404(idx)
@@ -90,18 +88,18 @@ class ProfileResource(Resource):
         _nickname=args['nickname']
 
         try:
-            if _pw!=None:
+            if _pw is not None:
                 current_user.pw=_pw
-            if _college!=None:
+            if _college is not None:
                 current_user.college=_college
-            if _major!=None:
+            if _major is not None:
                 current_user.major=_major
-            if _email!=None:
+            if _email is not None:
                 current_user.email=_email
-            if _nickname!=None:
+            if _nickname is not None:
                 current_user.nickname=_nickname
             current_user.update()
-            return self.get(idx)
+            return jsonify({'idx':self.get(idx)})
         except SQLAlchemyError as e:
             db.session.rollback()
             resp={"error":str(e)}
@@ -111,24 +109,36 @@ class ProfileResource(Resource):
         current_user=member.query.get_or_404(idx)
         try:
             current_user.delete(current_user)
-            resp={"status":"success"}
-            return resp, status.HTTP_204_NO_CONTENT
+            return True, status.HTTP_204_NO_CONTENT
         except SQLAlchemyError as e:
             db.session.rollback()
-            resp=jsonify({"error":str(e)})
+            resp={"error":str(e)}
             return resp, status.HTTP_401_UNAUTHORIZED
 
-class BoardResource(Resource):
-    def get(self): #show list of post
-        posts=board.query.all()
+class CategoryResource(Resource):
+    def get(self):
+        query=category.query.all()
         result=many_returns(query)
-        for x in result:
-            del x['reg_date']
+        
         return result
 
-    def post(self): #add new post board
+class BoardResource(Resource):
+    def get(self, cate): #show list of post
+        ctg=category.query.filter_by(idx=cate).first()
+        if ctg is None:
+            return {"error":"Category doesn't exist."}
+        query=board.query.filter_by(category=ctg.idx).order_by(board.reg_date).all()
+        result=many_returns(query)
+        for x in result:
+            x['reg_date']=str(x['reg_date'])
+        return jsonify(result)
+
+    def post(self, cate): #add new post board
+        ctg=category.query.filter_by(idx=cate).first()
+        if ctg is None:
+            return {"error":"Category doesn't exist."}, status.HTTP_406_NOT_ACCEPTABLE
+
         parser=reqparse.RequestParser()
-        parser.add_argument('category', type=int, required=True)
         parser.add_argument('writer', type=int, required=True)
         parser.add_argument('parent', type=int, required=True)
         parser.add_argument('od', type=int, required=True)
@@ -137,7 +147,6 @@ class BoardResource(Resource):
         parser.add_argument('content', type=str, required=True)
         args=parser.parse_args()
 
-        _category=args['category']
         _writer=args['writer']
         _parent=args['parent']
         _od=args['od']
@@ -145,138 +154,139 @@ class BoardResource(Resource):
         _subject=args['subject']
         _content=args['content']
         
+        mem=member.query.filter_by(idx=_writer).first()
+        
         try:
-            new_post=board(_category,_writer,_parent,_od,_major,_depth,_subject,_content)
+            new_post=board(cate,_writer,_parent,_od,_depth,_subject,_content)
             new_post.add(new_post)
 
         except SQLAlchemyError as e:
             db.session.rollback()
-            resp=jsonify({"error":str(e)})
+            resp={"error":str(e)}
             return resp, status.HTTP_400_BAD_REQUEST
 
         query=board.query.get(new_post.idx)
         result=query.as_dict()
-        del result['reg_date']
+        result['reg_date']=str(result['reg_date'])
         return result, status.HTTP_201_CREATED
 
 class PostResource(Resource):
-    def get(self,idx): #show content of post
-        current_post=board.query.get_or_404(idx)
+    def get(self,cate,idx): #show content of post
+        current_post=board.query.filter_by(category=cate,idx=idx).first()
+        if current_post is None:
+            return {"error":"Resource Not Founded"}, status.HTTP_404_NOT_FOUND
         result=current_post.as_dict()
-        del result['reg_date']
+        result['reg_date']=str(result['reg_date'])
         return result
 
-    def patch(self,idx): #edit post
-        current_post=board.query.get_or_404(idx)
+    def patch(self,cate,idx): #edit post
+        current_post=board.query.filter_by(category=cate,idx=idx).first()
+        if current_post is None:
+            return {"error":"Resource Not Founded"}, status.HTTP_404_NOT_FOUND
 
         parser=reqparse.RequestParser()
-        parser.add_argument('category', type=int)
-        parser.add_argument('writer', type=int)
-        parser.add_argument('parent', type=int)
-        parser.add_argument('od', type=int)
-        parser.add_argument('depth', type=int)
         parser.add_argument('subject', type=str, required=True)
         parser.add_argument('content', type=str, required=True)
         args=parser.parse_args()
 
-        _category=args['category']
-        _writer=args['writer']
-        _parent=args['parent']
-        _od=args['od']
-        _depth=args['depth']
-        _subject=args['subject']
-        _content=args['content']
-
         try:
             current_post.subject=args['subject']
             current_post.content=args['content']
-            current_post.session.update()
+            current_post.update()
+            return jsonify({'idx':current_post.idx})
+
         except SQLAlchemyError as e:
             db.session.rollback()
-            resp=nsonify({"error":str(e)})
-            return resp,status.HTTP_400_BAD_REQUEST
+            resp={"error":str(e)}
+            return resp, status.HTTP_400_BAD_REQUEST
 
-    def delete(self,idx): #delete post
-        current_post=board.query.get_or_404(idx)
+    def delete(self,cate,idx): #delete post
+        current_post=board.query.filter_by(category=cate,idx=idx).first()
+        if current_post is None:
+            return {"error":"Resource Not Founded"}, status.HTTP_404_NOT_FOUND
         try:
             current_post.delete(current_post)
-            response=make_response()
-            return response, status.HTTP_204_NO_CONTENT
+            return True, status.HTTP_204_NO_CONTENT
         except SQLAlchemyError as e:
             db.session.rollback()
-            resp=jsonify({"error":str(e)})
+            resp={"error":str(e)}
             return resp, status.HTTP_401_UNAUTHORIZED
 
 class CommentListResource(Resource):
-    def get(self,idx):  #show comment list of the post
-        comments=comment.query.filter_by(idx).all()
+    def get(self,post_idx):  #show comment list of the post
+        pst=board.query.filter_by(idx=post_idx).first()
+        if pst is None:
+            return {"error":"Post doesn't exist"}, status.HTTP_406_NOT_ACCEPTABLE
+        comments=comment.query.filter_by(bidx=pst.idx).all()
         result=many_returns(comments)
-        return result
+        
+        for x in result:
+            x['date']=str(x['date'])
+        return jsonify(result)
 
-    def post(self,idx): #add new comment on post
+    def post(self,post_idx): #add new comment on post
+        pst=board.query.filter_by(idx=post_idx).first()
+        if pst is None:
+            return {"error":"Post doesn't exist"}, status.HTTP_406_NOT_ACCEPTABLE
         parser=reqparse.RequestParser()
-        parser.add_argument('bidx', type=int, required=True)
         parser.add_argument('writer', type=int, required=True)
         parser.add_argument('od', type=int, required=True)
         parser.add_argument('depth', type=int, required=True)
         parser.add_argument('content', type=str, required=True)
         args=parser.parse_args()
 
-        _bidx=args['bidx']
         _writer=args['writer']
         _od=args['od']
-        _depth=['depth']
-        _content=['content']
+        _depth=args['depth']
+        _content=args['content']
         
         try:
-            new_comment=member(_bidx,_writer,_od,_depth,_content)
+            new_comment=comment(post_idx,_writer,_od,_depth,_content)
             new_comment.add(new_comment)
 
         except SQLAlchemyError as e:
             db.session.rollback()
-            resp=jsonify({"error":str(e)})
+            resp={"error":str(e)}
             return resp, status.HTTP_400_BAD_REQUEST
         
         query=comment.query.get(new_comment.idx)
         result=query.as_dict()
-        return result, status.HTTP_201_CREATED
+        result['date']=str(result['date'])
+        return jsonify(result), status.HTTP_201_CREATED
 
 class CommentResource(Resource):
-    def put(self,comment_idx): #edit comment
+    def patch(self, comment_idx): #edit comment
         current_comment=comment.query.get_or_404(comment_idx)
         
         parser=reqparse.RequestParser()
-        parser.add_argument('bidx', type=int)
-        parser.add_argument('writer', type=int)
-        parser.add_argument('od', type=int)
-        parser.add_argument('depth', type=int)
         parser.add_argument('content', type=str, required=True)
         args=parser.parse_args()
 
         try:
             current_comment.content=args['content']
-            current_comment.session.update()
+            current_comment.update()
+            return jsonify({'idx':current_comment.idx})
         except SQLAlchemyError as e:
             db.session.rollback()
-            resp=nsonify({"error":str(e)})
+            resp={"error":str(e)}
             return resp,status.HTTP_400_BAD_REQUEST
 
-    def delete(self,comment_idx):   #delete comment
+    def delete(self, comment_idx):   #delete comment
         current_comment=comment.query.get_or_404(comment_idx)
         try:
             current_comment.delete(current_comment)
-            response=make_response()
-            return response, status.HTTP_204_NO_CONTENT
+            return True, status.HTTP_204_NO_CONTENT
         except SQLAlchemyError as e:
             db.session.rollback()
-            resp=jsonify({"error":str(e)})
+            resp={"error":str(e)}
             return resp, status.HTTP_401_UNAUTHORIZED
 
 
 
 api.add_resource(UserResource,'/member')
-api.add_resource(ProfileResource,'/member/<idx>')
-api.add_resource(BoardResource,'/board/<category>')
-api.add_resource(PostResource,'/board/<idx>')
-api.add_resource(CommentListResource,'/board/<post_idx>/comments')
-api.add_resource(CommentResource,'/board/<post_idx>/comments/<comment_idx>')
+api.add_resource(ProfileResource,'/member/<int:idx>')
+api.add_resource(CategoryResource,'/CategoryList')
+api.add_resource(BoardResource,'/board/<int:cate>')
+api.add_resource(PostResource,'/post/<int:cate>/<int:idx>')
+api.add_resource(CommentListResource,'/post/<int:post_idx>/comments')
+api.add_resource(CommentResource,'/comments/<int:comment_idx>')

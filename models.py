@@ -51,7 +51,7 @@ class member(db.Model, AddUpdateDelete):
 
 class board(db.Model,AddUpdateDelete):
     idx=db.Column(db.Integer, primary_key=True)
-    category=db.Column(db.Integer, nullable=False)
+    category=db.Column(db.Integer, db.ForeignKey('category.idx'), nullable=False)
     writer=db.Column(db.Integer, db.ForeignKey('member.idx'), nullable=False)
     parent=db.Column(db.Integer)
     od=db.Column(db.Integer)
@@ -59,8 +59,8 @@ class board(db.Model,AddUpdateDelete):
     subject=db.Column(db.String(255), nullable=False)
     content=db.Column(db.TEXT)
     reg_date=db.Column(db.TIMESTAMP, server_default=db.func.current_timestamp(), nullable=False)
-    hit=db.Column(db.Integer)
-    goods=db.Column(db.Integer)
+    hit=db.Column(db.Integer, default=0)
+    goods=db.Column(db.Integer, default=0)
 
     def __init__(self,category,writer,parent,od,depth,subject,content):
         self.category=category
@@ -81,16 +81,16 @@ class category(db.Model,AddUpdateDelete):
         self.skin=skin
 
 class comment(db.Model,AddUpdateDelete):
-    index=db.Column('idx', db.Integer, primary_key=True)
-    board_idx=db.Column('bidx', db.Integer, db.ForeignKey('board.idx'), nullable=False)
+    idx=db.Column(db.Integer, primary_key=True)
+    bidx=db.Column(db.Integer, db.ForeignKey('board.idx',ondelete='CASCADE'), nullable=False)
     writer=db.Column(db.Integer, db.ForeignKey('member.idx'), nullable=False)
     od=db.Column(db.Integer)
     depth=db.Column(db.Integer)
-    content=db.Column(db.TEXT, nullable=False)
+    content=db.Column(db.TEXT)
     date=db.Column(db.TIMESTAMP, server_default=db.func.current_timestamp(), nullable=False)
 
-    def __init__(self,board_idx,writer,od,depth,content):
-        self.board_idx=board_idx
+    def __init__(self,bidx,writer,od,depth,content):
+        self.bidx=bidx
         self.writer=writer
         self.od=od
         self.depth=depth
