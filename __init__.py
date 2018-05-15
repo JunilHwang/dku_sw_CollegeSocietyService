@@ -154,17 +154,8 @@ def boardInsert(category) :
 # /boardView 접근시 해당 게시물 데이터 반환
 @app.route("/board/<idx>", methods=['GET'])
 def boardView(idx) :
-	sql = 'UPDATE board SET hit = hit+1 where idx=%s;'
-	getCursor()
-	cursor.execute(sql,(idx))
-	closeCon();
-	sql = '''
-		SELECT 	b.*, m.name as writerName
-		FROM 	board b
-		join 	member m on b.writer = m.idx
-		where 	b.idx=%s;
-	'''
-	getCursor()
+	sql = "SELECT * FROM board where idx=%s";
+	getCursor();
 	cursor.execute(sql,(idx))
 	data = cursor.fetchone()
 	closeCon();
@@ -203,7 +194,6 @@ def professorList() :
 	cursor.execute(sql)
 	data = cursor.fetchall()
 	closeCon()
-	print data
 	return json.dumps(data)
 
 # 교수 정보 가져오기
@@ -221,5 +211,5 @@ def professorGet(idx) :
 	closeCon()
 	return json.dumps(data)
 
-if __name__ == "__main__" : 
-	app.run(host='0.0.0.0',debug=True,threaded=True);
+# if __name__ == "__main__" : 
+# 	app.run(host='0.0.0.0',debug=True,threaded=True);

@@ -1,6 +1,6 @@
+# -*- coding: utf-8 -*-
 #models.py
 #models mapping to database
-
 from flask_sqlalchemy import SQLAlchemy
 from passlib.apps import custom_app_context as password_context     #for password hashing
 import re       #for regular expression

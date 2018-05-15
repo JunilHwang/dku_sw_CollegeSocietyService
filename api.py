@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #api.py
 '''
 <To Do List> - 18.05.13
