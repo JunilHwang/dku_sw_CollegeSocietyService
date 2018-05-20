@@ -1,34 +1,21 @@
 #api.py
 '''
-<To Do List> - 18.05.13
-cms,meta_data,file 테이블에 대한 api추가
-HTTP인증 - 추가 테스트 필요
-파일처리(?)
+HTTP Basic Auth에서
+JWT(JSON Web Token)인증으로 변경.
 '''
-'''
-<Guide>
-자원에 대한 수정은 patch메소드로 수정할 attribute만 전송
-인증이 필요한 경우 authentication header에 인증방식과 정보를 설정
-'''
-from flask import jsonify, g        #g:flask global object
+
+from flask import jsonify
 from flask_restful import Api,Resource,reqparse
 from models import *
-from flask_httpauth import HTTPBasicAuth        #for http authentication
+from auth import *
 from sqlalchemy.exc import SQLAlchemyError
 import status
+from flask_jwt_extended import (create_access_token,
+                                create_refresh_token, jwt_required,
+                                jwt_refresh_token_required, get_jwt_claims,
+                                get_jwt_identity, get_raw_jwt)
 
 api=Api()
-auth=HTTPBasicAuth()
-
-@auth.verify_password
-def verify_user_password(id,pw):
-    user=member.query.filter_by(id=id).first()
-    if not user or not user.verify_password(pw):
-        return False
-    g.user=user
-    return True
-class AuthRequiredResource(Resource):
-    method_decorators=[auth.login_required]
 
 class UserResource(Resource):
     def post(self): #add new user
@@ -71,7 +58,8 @@ class UserResource(Resource):
             resp={"error":str(e)}
             return resp, status.HTTP_400_BAD_REQUEST
     
-    @auth.login_required        #admin만 접근 가능해야함
+    #@auth.login_required        #admin만 접근 가능해야함
+    @jwt_required
     def get(self):      #show all users
         query=member.query.all()
         result=many_returns(query)
@@ -82,8 +70,10 @@ class UserResource(Resource):
 
 class ProfileResource(AuthRequiredResource):    #해당 클래스 자원은 모두 인증이 필요
     def get(self,idx): #show user info
+        identity=get_jwt_identity()
         current_user=member.query.get_or_404(idx)
-        if g.user.id==current_user.id:
+        
+        if identity==current_user.id:
             result=current_user.as_dict()
             result['regdate']=str(result['regdate'])
             del result['pw']        #응답에서 password 항목 삭제
@@ -92,8 +82,9 @@ class ProfileResource(AuthRequiredResource):    #해당 클래스 자원은 모�
             return {'error':'Not allowed to access this resource'}, status.HTTP_403_FORBIDDEN
 
     def patch(self, idx): #edit user info
+        identity=get_jwt_identity()
         current_user=member.query.get_or_404(idx)
-        if g.user.id is not current_user.id:    
+        if identity is not current_user.id:    
             return {'error':'Not allowed to access this resource'}, status.HTTP_403_FORBIDDEN
 
         parser=reqparse.RequestParser()
@@ -138,10 +129,11 @@ class ProfileResource(AuthRequiredResource):    #해당 클래스 자원은 모�
             db.session.rollback()
             resp={"error":str(e)}
             return resp, status.HTTP_400_BAD_REQUEST
-
+    
     def delete(self,idx):
+        identity=get_jwt_identity()
         current_user=member.query.get_or_404(idx)
-        if g.user.id is not current_user.id:        #인증과 삭제할 유저의 id가 일치하지 않을 때
+        if identity is not current_user.id:        #인증과 삭제할 유저의 id가 일치하지 않을 때
             return {"error":"Not allowed to access this resource"}, status.HTTP_403_FORBIDDEN
         try:
             current_user.delete(current_user)
@@ -168,7 +160,8 @@ class BoardResource(Resource):
             x['reg_date']=str(x['reg_date'])
         return jsonify(result)
 
-    @auth.login_required
+    #@auth.login_required
+    @jwt_required
     def post(self, cate): #add new post board
         ctg=category.query.filter_by(idx=cate).first()
         if ctg is None:
@@ -182,7 +175,8 @@ class BoardResource(Resource):
         parser.add_argument('content', type=str, required=True)
         args=parser.parse_args()
 
-        _writer=g.user.idx
+        claims=get_jwt_claims()
+        _writer=claims['index']
         _parent=args['parent']
         _od=args['od']
         _depth=args['depth']
@@ -212,12 +206,14 @@ class PostResource(Resource):
         result['reg_date']=str(result['reg_date'])
         return result
 
-    @auth.login_required
+    #@auth.login_required
+    @jwt_required
     def patch(self,cate,idx): #edit post
         current_post=board.query.filter_by(category=cate,idx=idx).first()
         if current_post is None:
             return {"error":"Resource Not Founded"}, status.HTTP_404_NOT_FOUND
-        if g.user.idx is not current_post.writer:       #인증과 수정할 post의 작성자가 일치하지 않을 때
+        claims=get_jwt_claims()
+        if claims['index'] is not current_post.writer:       #인증과 수정할 post의 작성자가 일치하지 않을 때
             return {"error":'Not allowed to access this resource'}, status.HTTP_403_FORBIDDEN
 
         parser=reqparse.RequestParser()
@@ -236,12 +232,14 @@ class PostResource(Resource):
             resp={"error":str(e)}
             return resp, status.HTTP_400_BAD_REQUEST
 
-    @auth.login_required
+    #@auth.login_required
+    @jwt_required
     def delete(self,cate,idx): #delete post
         current_post=board.query.filter_by(category=cate,idx=idx).first()
         if current_post is None:
             return {"error":"Resource Not Founded"}, status.HTTP_404_NOT_FOUND
-        if g.user.idx is not current_post.writer:       #인증과 삭제할 post의 작성자가 일치하지 않을때
+        claims=get_jwt_claims()
+        if claims['index'] is not current_post.writer:       #인증과 삭제할 post의 작성자가 일치하지 않을때
             return {"error":"Not allowed to access this resource"}, status.HTTP_403_FORBIDDEN
         try:
             current_post.delete(current_post)
@@ -263,7 +261,8 @@ class CommentListResource(Resource):
             x['date']=str(x['date'])
         return jsonify(result)
 
-    @auth.login_required
+    #@auth.login_required
+    @jwt_required
     def post(self,post_idx): #add new comment on post
         pst=board.query.filter_by(idx=post_idx).first()
         if pst is None:
@@ -274,7 +273,8 @@ class CommentListResource(Resource):
         parser.add_argument('content', type=str, required=True)
         args=parser.parse_args()
 
-        _writer=g.user.idx
+        claims=get_jwt_claims()
+        _writer=claims['index']
         _od=args['od']
         _depth=args['depth']
         _content=args['content']
@@ -294,10 +294,12 @@ class CommentListResource(Resource):
         return jsonify(result), status.HTTP_201_CREATED
 
 class CommentResource(Resource):
-    @auth.login_required
+    #@auth.login_required
+    @jwt_required
     def patch(self, comment_idx): #edit comment
         current_comment=comment.query.get_or_404(comment_idx)
-        if g.user.idx is not current_comment.writer:    #인증과 수정할 comment의 작성자가 일치하지 않을때
+        claims=get_jwt_claims()
+        if claims['index'] is not current_comment.writer:    #인증과 수정할 comment의 작성자가 일치하지 않을때
             return {"error":"Not allowed to access this resource"}, status.HTTP_403_FORBIDDEN
         parser=reqparse.RequestParser()
         parser.add_argument('content', type=str, required=True)
@@ -312,10 +314,12 @@ class CommentResource(Resource):
             resp={"error":str(e)}
             return resp,status.HTTP_400_BAD_REQUEST
     
-    @auth.login_required
+    #@auth.login_required
+    @jwt_required
     def delete(self, comment_idx):   #delete comment
         current_comment=comment.query.get_or_404(comment_idx)
-        if g.user.idx is not current_comment.writer:        #인증과 삭제할 comment의 작성자가 일치하지 않을때
+        claims=get_jwt_claims()
+        if claims['index'] is not current_comment.writer:        #인증과 삭제할 comment의 작성자가 일치하지 않을때
             return {"error":"Not allowed to access this resource"}, status.HTTP_403_FORBIDDEN
         try:
             current_comment.delete(current_comment)
@@ -325,10 +329,48 @@ class CommentResource(Resource):
             resp={"error":str(e)}
             return resp, status.HTTP_401_UNAUTHORIZED
 
+
+class TestResource(Resource):
+    @jwt_required
+    def get(self):
+        claims=get_jwt_claims()
+        print(claims['id'])
+        print(claims['index'])
+        return jsonify({"hello":"world"})
+
+class GetToken(Resource):
+    def post(self):
+        parser=reqparse.RequestParser()
+        parser.add_argument('id', type=str)
+        parser.add_argument('pw', type=str)
+        args=parser.parse_args()
+        id=args['id']
+        pw=args['pw']
+        user=member.query.filter_by(id=id).first()
+
+        if not user or not user.verify_password(pw):
+            return {"error":"User doesn't exist"}, status.HTTP_401_UNAUTHORIZED
+        if not user.verify_password(pw):
+            return {"error":"password invalid"}, status.HTTP_401_UNAUTHORIZED
+        access_token=create_access_token(identity=id)
+        refresh_token=create_refresh_token(identity=id)
+
+        return jsonify({'access_token':access_token, 'refresh_token':refresh_token})
+
+class RefreshToken(Resource):
+    @jwt_refresh_token_required
+    def post(self):
+        current_user = get_jwt_identity()
+        access_token = create_access_token(identity = current_user)
+        return {'access_token': access_token}
+
 api.add_resource(UserResource,'/member')
 api.add_resource(ProfileResource,'/member/<int:idx>')
 api.add_resource(CategoryResource,'/CategoryList')
 api.add_resource(BoardResource,'/board/<int:cate>')
-api.add_resource(PostResource,'/post/<int:cate>/<int:idx>')
-api.add_resource(CommentListResource,'/post/<int:post_idx>/comments')
+api.add_resource(PostResource,'/board/<int:cate>/<int:idx>')
+api.add_resource(CommentListResource,'/board/<int:post_idx>/comments')
 api.add_resource(CommentResource,'/comments/<int:comment_idx>')
+api.add_resource(TestResource,'/test')
+api.add_resource(GetToken,'/token')
+api.add_resource(RefreshToken,'/refresh_token')

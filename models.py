@@ -4,6 +4,7 @@
 from flask_sqlalchemy import SQLAlchemy
 from passlib.apps import custom_app_context as password_context     #for password hashing
 import re       #for regular expression
+
 db=SQLAlchemy()
 
 def many_returns(query):    #쿼리 응답이 여러개의 튜플을 리턴할 때 serialization
