@@ -56,7 +56,7 @@ def memberInsert() :
 		nickname=%s,
 		email=%s,
 		undergrad_number=%s,
-		collage='단국대학교',
+		college='단국대학교',
 		major='소프트웨어학과',
 		regdate=now()
 	'''
@@ -69,7 +69,7 @@ def memberInsert() :
 @app.route("/member/<idx>", methods=['PUT'])
 def memberUpdate(idx) :
 	getCursor()
-	if not request.form['pw'] :
+	if request.form.get('pw', 0) != 0 :
 		_name = request.form['name']
 		_nickname = request.form['nickname']
 		_email = request.form['email']
@@ -154,8 +154,17 @@ def boardInsert(category) :
 # /boardView 접근시 해당 게시물 데이터 반환
 @app.route("/board/<idx>", methods=['GET'])
 def boardView(idx) :
-	sql = "SELECT * FROM board where idx=%s";
-	getCursor();
+	sql = 'UPDATE board SET hit = hit+1 where idx=%s;'
+	getCursor()
+	cursor.execute(sql,(idx))
+	closeCon();
+	sql = '''
+		SELECT 	b.*, m.name as writerName
+		FROM 	board b
+		join 	member m on b.writer = m.idx
+		where 	b.idx=%s;
+	'''
+	getCursor()
 	cursor.execute(sql,(idx))
 	data = cursor.fetchone()
 	closeCon();
@@ -194,6 +203,7 @@ def professorList() :
 	cursor.execute(sql)
 	data = cursor.fetchall()
 	closeCon()
+	print data
 	return json.dumps(data)
 
 # 교수 정보 가져오기

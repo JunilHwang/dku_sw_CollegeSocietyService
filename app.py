@@ -56,7 +56,7 @@ def memberInsert() :
 		nickname=%s,
 		email=%s,
 		undergrad_number=%s,
-		collage='단국대학교',
+		college='단국대학교',
 		major='소프트웨어학과',
 		regdate=now()
 	'''
@@ -69,7 +69,7 @@ def memberInsert() :
 @app.route("/member/<idx>", methods=['PUT'])
 def memberUpdate(idx) :
 	getCursor()
-	if not request.form['pw'] :
+	if request.form.get('pw', 0) != 0 :
 		_name = request.form['name']
 		_nickname = request.form['nickname']
 		_email = request.form['email']
