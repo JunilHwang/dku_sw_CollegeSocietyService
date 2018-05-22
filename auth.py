@@ -1,3 +1,4 @@
+#-*- coding: utf-8 -*-
 from flask import g
 from flask_restful import Resource
 from flask_httpauth import HTTPBasicAuth        #for http authentication
@@ -24,9 +25,10 @@ def auth_error():
     return "Wrong ID/Password. Access Denied."
 
 @jwt.user_claims_loader     #토큰 생성시 추가적인 정보를 토큰에 담는다.
-def add_claims_to_access_token(identity):   #user id와 index를 포함
+def add_claims_to_access_token(identity):   #user id와 nickname, index를 포함
     query=member.query.filter_by(id=identity).first()
     return {
         "id":identity,
-        "index":query.idx
+        "index":query.idx,
+        "nickname":query.nickname
         }

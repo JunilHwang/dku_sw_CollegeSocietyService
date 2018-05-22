@@ -1,3 +1,4 @@
+#-*- coding: utf-8 -*-
 #models.py
 #models mapping to database
 
@@ -35,7 +36,7 @@ class member(db.Model, AddUpdateDelete):
     major=db.Column(db.String(20), nullable=False)
     undergrad_number=db.Column(db.Integer, nullable=False)
     email=db.Column(db.String(30), nullable=False)
-    nickname=db.Column(db.String(20))
+    nickname=db.Column(db.String(20), unique=True)
     regdate=db.Column(db.TIMESTAMP, server_default=db.func.current_timestamp(), nullable=False)
     level=db.Column(db.Integer, default=1)
 
@@ -72,11 +73,13 @@ class member(db.Model, AddUpdateDelete):
 
 class board(db.Model,AddUpdateDelete):
     idx=db.Column(db.Integer, primary_key=True)
-    category=db.Column(db.Integer, db.ForeignKey('category.idx'), nullable=False)
-    writer=db.Column(db.Integer, db.ForeignKey('member.idx'), nullable=False)
-    parent=db.Column(db.Integer)
-    od=db.Column(db.Integer)
-    depth=db.Column(db.Integer)
+    category=db.Column(db.String(20), db.ForeignKey('category.id',ondelete='CASCADE',onupdate='CASCADE'))
+    cate=db.relationship('category',backref='board')
+    writer=db.Column(db.Integer, db.ForeignKey('member.idx',ondelete='CASCADE',onupdate='CASCADE'))
+    author=db.relationship('member',backref='board')
+    parent=db.Column(db.Integer, nullable=False, default=0)
+    od=db.Column(db.Integer, nullable=False, default=0)
+    depth=db.Column(db.Integer, nullable=False, default=0)
     subject=db.Column(db.String(255), nullable=False)
     content=db.Column(db.TEXT)
     reg_date=db.Column(db.TIMESTAMP, server_default=db.func.current_timestamp(), nullable=False)
@@ -94,19 +97,22 @@ class board(db.Model,AddUpdateDelete):
 
 class category(db.Model,AddUpdateDelete):
     idx=db.Column(db.Integer, primary_key=True)
+    id=db.Column(db.String(20), unique=True, nullable=False)
     name=db.Column(db.String(20),nullable=False)
-    skin=db.Column(db.String(50))
+    skin=db.Column(db.String(50), nullable=False, default="skin")
 
-    def __init__(self,name,skin):
+    def __init__(self,id,name,skin):
+        self.id=id
         self.name=name
         self.skin=skin
 
 class comment(db.Model,AddUpdateDelete):
     idx=db.Column(db.Integer, primary_key=True)
     bidx=db.Column(db.Integer, db.ForeignKey('board.idx',ondelete='CASCADE'), nullable=False)
-    writer=db.Column(db.Integer, db.ForeignKey('member.idx'), nullable=False)
-    od=db.Column(db.Integer)
-    depth=db.Column(db.Integer)
+    writer=db.Column(db.Integer, db.ForeignKey('member.idx',ondelete='CASCADE',onupdate='CASCADE'))
+    author=db.relationship('member',backref='comment')
+    od=db.Column(db.Integer, default=0, nullable=False)
+    depth=db.Column(db.Integer, default=0, nullable=False)
     content=db.Column(db.TEXT)
     date=db.Column(db.TIMESTAMP, server_default=db.func.current_timestamp(), nullable=False)
 
@@ -119,10 +125,10 @@ class comment(db.Model,AddUpdateDelete):
 
 class cms(db.Model,AddUpdateDelete):
     idx=db.Column(db.Integer, primary_key=True)
-    content=db.Column(db.VARCHAR(255))
-    deposit=db.Column(db.Integer)
-    withdraw=db.Column(db.Integer)
-    date=db.Column(db.DATE)
+    content=db.Column(db.VARCHAR(255), nullable=False)
+    deposit=db.Column(db.Integer, default=0, nullable=False)
+    withdraw=db.Column(db.Integer, default=0, nullable=False)
+    date=db.Column(db.DATE, nullable=False)
 
     def __init__(self,content,deposit,withdraw,date):
         self.content=content
@@ -132,7 +138,7 @@ class cms(db.Model,AddUpdateDelete):
 
 class meta_data(db.Model, AddUpdateDelete):
     key=db.Column(db.String(20), primary_key=True)
-    value=db.Column(db.TEXT)
+    value=db.Column(db.TEXT, nullable=False)
 
     def __init__(self, key, value):
         self.key=key
@@ -140,11 +146,11 @@ class meta_data(db.Model, AddUpdateDelete):
 
 class files(db.Model, AddUpdateDelete):
     idx=db.Column(db.Integer, primary_key=True)
-    table=db.Column(db.String(20))
-    id=db.Column(db.Integer)
-    origin_name=db.Column(db.VARCHAR(255))
-    file_name=db.Column(db.String(50))
-    reg_date=db.Column(db.TIMESTAMP)
+    table=db.Column(db.String(20), nullable=False)
+    id=db.Column(db.Integer, nullable=False)
+    origin_name=db.Column(db.VARCHAR(255), nullable=False)
+    file_name=db.Column(db.String(50), nullable=False)
+    reg_date=db.Column(db.TIMESTAMP,server_default=db.func.current_timestamp(), nullable=False)
 
     def __init__(self,table,id,origin_name,file_name,reg_date):
         self.table=table
@@ -152,3 +158,20 @@ class files(db.Model, AddUpdateDelete):
         self.origin_name=origin_name
         self.file_name=file_name
         self.reg_date=reg_date
+
+class professor(db.Model, AddUpdateDelete):
+    idx=db.Column(db.Integer, primary_key=True)
+    name=db.Column(db.String(20), nullable=False)
+    tel=db.Column(db.String(30), nullable=False)
+    email=db.Column(db.String(30), nullable=False)
+    url=db.Column(db.String(50), nullable=False)
+    course=db.Column(db.String(50), nullable=False)
+    content=db.Column(db.TEXT, nullable=False)
+
+    def __init__(self,name,tel,email,url,course,content):
+        self.name=name
+        self.tel=tel
+        self.email=email
+        self.url=url
+        self.course=course
+        self.content=content

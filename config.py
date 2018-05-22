@@ -1,7 +1,7 @@
 #config.py
 #configuration of flask app running factors
 
-DEBUG=False              #app running debug option. Must off running on operating server.
+DEBUG=True              #app running debug option. Must off running on operating server.
 PORT=5000               #flask app port num
 HOST="0.0.0.0"        #flask app host
 SQLALCHEMY_TRACK_MODIFICATIONS=True

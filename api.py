@@ -1,7 +1,29 @@
+#-*- coding: utf-8 -*-
 #api.py
+
 '''
 HTTP Basic Auth에서
 JWT(JSON Web Token)인증으로 변경.
+How to make logout process with JWT?
+
+2018.05.22
+게시글 조회시 hit +1
+게시글, 댓글에 대한 get요청시 작성자의 닉네임도 반환('nickname').
+탈퇴회원의 경우 "nickname":"탈퇴회원"으로 반환
+영문id로 category접근
+professor table에 대한 api추가
+그밖의 자잘한 db세부사항 반영(무결성조건, 속성명, 기본값 등)
+'''
+'''
+사용자등록, 전체 목록 : /member
+사용자 정보 변경, 삭제 : /member/<사용자 idx>
+카테고리 : /CategoryList
+게시글 목록, 추가: /board/<category_id>
+게시글 수정, 삭제: /board/<category_id>/<게시글 idx>
+댓글 목록, 추가: /board/<게시글 idx>/comments
+댓글 수정, 삭제: /comments/<댓글 idx>
+교수 목록: /professor
+교수 개별: /professor/<교수 idx>
 '''
 
 from flask import jsonify
@@ -50,6 +72,8 @@ class UserResource(Resource):
                 new_member.add(new_member)      #member추가
                 query=member.query.get(new_member.idx)  #추가된 새 member에 대한 정보를 받아옴
                 result=query.as_dict()                  #<---필요한 attribute만 남기고 리턴할 것
+                del result['pw']
+                result['regdate']=str(result['regdate'])
                 return result, status.HTTP_201_CREATED
             else:
                 return {"error":error_message}, status.HTTP_400_BAD_REQUEST
@@ -84,7 +108,9 @@ class ProfileResource(AuthRequiredResource):    #해당 클래스 자원은 모�
     def patch(self, idx): #edit user info
         identity=get_jwt_identity()
         current_user=member.query.get_or_404(idx)
-        if identity is not current_user.id:    
+        print(identity)
+        print(current_user.id)
+        if identity != current_user.id:    
             return {'error':'Not allowed to access this resource'}, status.HTTP_403_FORBIDDEN
 
         parser=reqparse.RequestParser()
@@ -133,7 +159,7 @@ class ProfileResource(AuthRequiredResource):    #해당 클래스 자원은 모�
     def delete(self,idx):
         identity=get_jwt_identity()
         current_user=member.query.get_or_404(idx)
-        if identity is not current_user.id:        #인증과 삭제할 유저의 id가 일치하지 않을 때
+        if identity != current_user.id:        #인증과 삭제할 유저의 id가 일치하지 않을 때
             return {"error":"Not allowed to access this resource"}, status.HTTP_403_FORBIDDEN
         try:
             current_user.delete(current_user)
@@ -151,19 +177,20 @@ class CategoryResource(Resource):
 
 class BoardResource(Resource):
     def get(self, cate): #show list of post
-        ctg=category.query.filter_by(idx=cate).first()
+        ctg=category.query.filter_by(id=cate).first()
         if ctg is None:
-            return {"error":"Category doesn't exist."}, status.HTTP_404_NOT_FOUND
-        query=board.query.filter_by(category=ctg.idx).order_by(board.reg_date).all()
+            return {"error":"Cxategory doesn't exist."}, status.HTTP_404_NOT_FOUND
+        query=board.query.filter_by(category=ctg.id).order_by(board.reg_date).all()
         result=many_returns(query)
-        for x in result:
-            x['reg_date']=str(x['reg_date'])
+        nick=[sq.author.nickname for sq in query]
+        for i in range(len(result)):
+            result[i]['nickname']=nick[i]
+            result[i]['reg_date']=str(result[i]['reg_date'])
         return jsonify(result)
 
-    #@auth.login_required
     @jwt_required
     def post(self, cate): #add new post board
-        ctg=category.query.filter_by(idx=cate).first()
+        ctg=category.query.filter_by(id=cate).first()
         if ctg is None:
             return {"error":"Category doesn't exist."}, status.HTTP_404_NOT_FOUND
 
@@ -202,11 +229,17 @@ class PostResource(Resource):
         current_post=board.query.filter_by(category=cate,idx=idx).first()
         if current_post is None:
             return {"error":"Resource Not Founded"}, status.HTTP_404_NOT_FOUND
+        current_post.hit+=1         #조회수 +1
+        current_post.update()
+        
         result=current_post.as_dict()
         result['reg_date']=str(result['reg_date'])
+        if current_post.writer is not None:
+            result['nickname']=current_post.author.nickname
+        else:
+            result['nickname']="탈퇴회원"
         return result
 
-    #@auth.login_required
     @jwt_required
     def patch(self,cate,idx): #edit post
         current_post=board.query.filter_by(category=cate,idx=idx).first()
@@ -217,13 +250,18 @@ class PostResource(Resource):
             return {"error":'Not allowed to access this resource'}, status.HTTP_403_FORBIDDEN
 
         parser=reqparse.RequestParser()
-        parser.add_argument('subject', type=str, required=True)
-        parser.add_argument('content', type=str, required=True)
+        parser.add_argument('subject', type=str)
+        parser.add_argument('content', type=str)
+        parser.add_argument('goods', type=str)
         args=parser.parse_args()
 
         try:
-            current_post.subject=args['subject']
-            current_post.content=args['content']
+            if args['subject'] is not None:
+                current_post.subject=args['subject']
+            if args['content'] is not None:
+                current_post.content=args['content']
+            if args['goods'] is not None:
+                current_post.goods+=1
             current_post.update()
             return jsonify({'idx':current_post.idx})
 
@@ -232,7 +270,6 @@ class PostResource(Resource):
             resp={"error":str(e)}
             return resp, status.HTTP_400_BAD_REQUEST
 
-    #@auth.login_required
     @jwt_required
     def delete(self,cate,idx): #delete post
         current_post=board.query.filter_by(category=cate,idx=idx).first()
@@ -256,12 +293,15 @@ class CommentListResource(Resource):
             return {"error":"Post doesn't exist"}, status.HTTP_404_NOT_FOUND
         comments=comment.query.filter_by(bidx=pst.idx).all()
         result=many_returns(comments)
-        
-        for x in result:
-            x['date']=str(x['date'])
+        nick=[sq.author.nickname for sq in comments]
+        for i in range(len(result)):
+            if result[i]['writer'] is not None:
+                result[i]['nickname']=nick[i]
+            else:
+                result[i]['nickname']="탈퇴회원"
+            result[i]['date']=str(result[i]['date'])
         return jsonify(result)
 
-    #@auth.login_required
     @jwt_required
     def post(self,post_idx): #add new comment on post
         pst=board.query.filter_by(idx=post_idx).first()
@@ -289,17 +329,15 @@ class CommentListResource(Resource):
             return resp, status.HTTP_400_BAD_REQUEST
         
         query=comment.query.get(new_comment.idx)
-        result=query.as_dict()
-        result['date']=str(result['date'])
-        return jsonify(result), status.HTTP_201_CREATED
+        result={'idx':query.idx}
+        return result, status.HTTP_201_CREATED
 
 class CommentResource(Resource):
-    #@auth.login_required
     @jwt_required
     def patch(self, comment_idx): #edit comment
         current_comment=comment.query.get_or_404(comment_idx)
         claims=get_jwt_claims()
-        if claims['index'] is not current_comment.writer:    #인증과 수정할 comment의 작성자가 일치하지 않을때
+        if claims['index'] != current_comment.writer:    #인증과 수정할 comment의 작성자가 일치하지 않을때
             return {"error":"Not allowed to access this resource"}, status.HTTP_403_FORBIDDEN
         parser=reqparse.RequestParser()
         parser.add_argument('content', type=str, required=True)
@@ -314,12 +352,11 @@ class CommentResource(Resource):
             resp={"error":str(e)}
             return resp,status.HTTP_400_BAD_REQUEST
     
-    #@auth.login_required
     @jwt_required
     def delete(self, comment_idx):   #delete comment
         current_comment=comment.query.get_or_404(comment_idx)
         claims=get_jwt_claims()
-        if claims['index'] is not current_comment.writer:        #인증과 삭제할 comment의 작성자가 일치하지 않을때
+        if claims['index'] != current_comment.writer:        #인증과 삭제할 comment의 작성자가 일치하지 않을때
             return {"error":"Not allowed to access this resource"}, status.HTTP_403_FORBIDDEN
         try:
             current_comment.delete(current_comment)
@@ -329,16 +366,26 @@ class CommentResource(Resource):
             resp={"error":str(e)}
             return resp, status.HTTP_401_UNAUTHORIZED
 
-
-class TestResource(Resource):
-    @jwt_required
+class ProfessorListResource(Resource):
     def get(self):
-        claims=get_jwt_claims()
-        print(claims['id'])
-        print(claims['index'])
-        return jsonify({"hello":"world"})
+        prof=professor.query.all()
+        result=many_returns(prof)
+        for x in result:
+            f=files.query.filter_by(idx=x['idx'],table="professor").first()
+            x['origin_name']=f.origin_name
+            x['file_name']=f.file_name
+        return jsonify(result)
 
-class GetToken(Resource):
+class ProfessorResource(Resource):
+    def get(self,idx):
+        prof=professor.query.filter_by(idx=idx).first()
+        result=prof.as_dict()
+        f=files.query.filter_by(idx=prof.idx).first()
+        result['origin_name']=f.origin_name
+        result['file_name']=f.file_name
+        return jsonify(result)
+
+class GetToken(Resource):   #로그인 시 access token, refresh token생성
     def post(self):
         parser=reqparse.RequestParser()
         parser.add_argument('id', type=str)
@@ -352,25 +399,34 @@ class GetToken(Resource):
             return {"error":"User doesn't exist"}, status.HTTP_401_UNAUTHORIZED
         if not user.verify_password(pw):
             return {"error":"password invalid"}, status.HTTP_401_UNAUTHORIZED
-        access_token=create_access_token(identity=id)
-        refresh_token=create_refresh_token(identity=id)
+        access_token=create_access_token(identity=id)   #15분
+        refresh_token=create_refresh_token(identity=id) #30일
 
         return jsonify({'access_token':access_token, 'refresh_token':refresh_token})
 
-class RefreshToken(Resource):
+class RefreshToken(Resource):   #access token이 만료 되었을 때 refresh token을 이용하여 새 access token 발급
     @jwt_refresh_token_required
     def post(self):
         current_user = get_jwt_identity()
         access_token = create_access_token(identity = current_user)
         return {'access_token': access_token}
 
+class TestResource(Resource):   #인증 테스트용. 나중에 삭제 바람
+    @jwt_required
+    def get(self):
+        claims=get_jwt_claims()
+        return jsonify({claims[id]:claims[index]})
+
 api.add_resource(UserResource,'/member')
 api.add_resource(ProfileResource,'/member/<int:idx>')
 api.add_resource(CategoryResource,'/CategoryList')
-api.add_resource(BoardResource,'/board/<int:cate>')
-api.add_resource(PostResource,'/board/<int:cate>/<int:idx>')
+api.add_resource(BoardResource,'/board/<cate>')
+api.add_resource(PostResource,'/board/<cate>/<int:idx>')
 api.add_resource(CommentListResource,'/board/<int:post_idx>/comments')
 api.add_resource(CommentResource,'/comments/<int:comment_idx>')
-api.add_resource(TestResource,'/test')
+api.add_resource(ProfessorListResource,'/professor')
+api.add_resource(ProfessorResource,'/professor/<int:idx>')
+
 api.add_resource(GetToken,'/token')
 api.add_resource(RefreshToken,'/refresh_token')
+api.add_resource(TestResource,'/test')      #테스트 후 삭제 바람
