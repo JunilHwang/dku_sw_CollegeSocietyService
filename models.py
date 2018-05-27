@@ -34,7 +34,7 @@ class member(db.Model, AddUpdateDelete):
     name=db.Column(db.String(20), nullable=False)
     college=db.Column(db.String(20), nullable=False)
     major=db.Column(db.String(20), nullable=False)
-    undergrad_number=db.Column(db.Integer, nullable=False)
+    undergrad_number=db.Column(db.Integer, nullable=False, default=0)
     email=db.Column(db.String(30), nullable=False)
     nickname=db.Column(db.String(20), unique=True)
     regdate=db.Column(db.TIMESTAMP, server_default=db.func.current_timestamp(), nullable=False)
@@ -59,12 +59,14 @@ class member(db.Model, AddUpdateDelete):
         self.pw=password_context.encrypt(password)
         return '', True
 
-    def __init__(self,id,name,college,major,undergrad_number,email,nickname):
+    def mail_auth_complete(self,undergrad_num):
+        self.undergrad_number=undergrad_num
+
+    def __init__(self,id,name,college,major,email,nickname):
         self.id=id
         self.name=name
         self.college=college
         self.major=major
-        self.undergrad_number=undergrad_number
         self.email=email
         if nickname:
             self.nickname=nickname

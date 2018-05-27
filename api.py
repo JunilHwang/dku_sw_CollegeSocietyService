@@ -2,16 +2,15 @@
 #api.py
 '''
 HTTP Basic Auth에서
-JWT(JSON Web Token)인증으로 변경.
+JWT(JSON Web Token)인증으로 변경. 기존 코드는 유지
 How to make logout process with JWT?
 
-2018.05.22
-게시글 조회시 hit +1
-게시글, 댓글에 대한 get요청시 작성자의 닉네임도 반환('nickname').
-탈퇴회원의 경우 "nickname":"탈퇴회원"으로 반환
-영문id로 category접근
-professor table에 대한 api추가
-그밖의 자잘한 db세부사항 반영(무결성조건, 속성명, 기본값 등)
+2018.05.27
+db접속 정보,jwt키,메일계정 등의 보안사항을 스크립트에서 제거하고
+환경변수를 load하는것으로 수정.
+허접한 메일 인증 추가
+(MailAuthenticaion class의 redirect 주소, mail.py의 url확인)
+access token과 refresh token 기본 만료 시간을 1시간, 무제한으로 변경
 '''
 '''
 사용자등록, 전체 목록 : /member
@@ -23,13 +22,15 @@ professor table에 대한 api추가
 댓글 수정, 삭제: /comments/<댓글 idx>
 교수 목록: /professor
 교수 개별: /professor/<교수 idx>
+
 '''
 
-from flask import jsonify
+from flask import jsonify, redirect
 from flask_restful import Api,Resource,reqparse
 from models import *
 from auth import *
-from mail import send_email
+from mail import send_email,title
+from sqlalchemy import or_
 from sqlalchemy.exc import SQLAlchemyError
 import status
 from flask_jwt_extended import (create_access_token,
@@ -61,11 +62,20 @@ class UserResource(Resource):
         _email=args['email']
         _nickname=args['nickname']
         
-        exist_id=member.query.filter_by(id=_id).first()
-        if exist_id is not None:    #입력 id가 이미 존재할때
+        query=member.query
+        if query.filter_by(id=_id).first() is not None:    #입력 id가 이미 존재할때
             return {"error": "User with the same ID already exists"}, status.HTTP_400_BAD_REQUEST
+        if query.filter_by(nickname=_nickname).first() is not None: #중복 닉네임
+            return {"error": "User with the same nickname already exists"}, status.HTTP_400_BAD_REQUEST
+        if query.filter_by(undergrad_number=_undergrad).first() is not None:    #1인 1아이디
+            return {"error": "User with the student id already exists"}
+        if not _email[:8] == str(_undergrad):
+            return {"error": "The email doesn't match with undergrad_number"}
+        if not _email[9:] == "dankook.ac.kr":
+            return {"error": "The email should use dankook university email for student authentication"}
+
         try:
-            new_member=member(_id,_name,_college,_major,_undergrad,_email,_nickname)
+            new_member=member(_id,_name,_college,_major,_email,_nickname)
             error_message, pw_ok = \
                 new_member.check_password_strength_and_hash_if_ok(_pw) #패스워드 유효성 체크, 만족시 해시 함수 적용.
             if pw_ok:
@@ -74,6 +84,7 @@ class UserResource(Resource):
                 result=query.as_dict()                  #<---필요한 attribute만 남기고 리턴할 것
                 del result['pw']
                 result['regdate']=str(result['regdate'])
+                send_email(_email,title,result)
                 return result, status.HTTP_201_CREATED
             else:
                 return {"error":error_message}, status.HTTP_400_BAD_REQUEST
@@ -81,16 +92,26 @@ class UserResource(Resource):
             db.session.rollback()
             resp={"error":str(e)}
             return resp, status.HTTP_400_BAD_REQUEST
-    
-    #@auth.login_required        #admin만 접근 가능해야함
-    @jwt_required
-    def get(self):      #show all users
-        query=member.query.all()
-        result=many_returns(query)
-        for x in result:
-            x['regdate']=str(x['regdate'])
-        return jsonify(result)
+          
+    #@jwt_required               #admin만 접근 가능해야함
+    #def get(self):      #show all users
+    #    query=member.query.all()
+    #    result=many_returns(query)
+    #    for x in result:
+    #        x['regdate']=str(x['regdate'])
+    #    return jsonify(result)
 
+class MailAuthentication(Resource):
+    def get(self,user_idx):
+        try:
+            ma_mem=member.query.filter_by(idx=user_idx).first()
+            ma_mem.mail_auth_complete(ma_mem.email[:8])
+            ma_mem.update()
+            return redirect("http://www.google.com",302)
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            resp={"error":str(e)}
+            return resp, status.HTTP_400_BAD_REQUEST
 
 class ProfileResource(AuthRequiredResource):    #해당 클래스 자원은 모두 인증이 필요
     def get(self,idx): #show user info
@@ -115,22 +136,16 @@ class ProfileResource(AuthRequiredResource):    #해당 클래스 자원은 모�
 
         parser=reqparse.RequestParser()
         #parsing list중 필요없는것 삭제할 것
-        parser.add_argument('id', type=str)
         parser.add_argument('pw', type=str)
-        parser.add_argument('name', type=str)
         parser.add_argument('college', type=str)
         parser.add_argument('major', type=str)
-        parser.add_argument('undergrad_number', type=int)
         parser.add_argument('email', type=str)
         parser.add_argument('nickname', type=str)
         args=parser.parse_args()
 
-        _id=args['id']
         _pw=args['pw']
-        _name=args['name']
         _college=args['college']
         _major=args['major']
-        _undergrad=args['undergrad_number']
         _email=args['email']
         _nickname=args['nickname']
 
@@ -179,7 +194,7 @@ class BoardResource(Resource):
     def get(self, cate): #show list of post
         ctg=category.query.filter_by(id=cate).first()
         if ctg is None:
-            return {"error":"Cxategory doesn't exist."}, status.HTTP_404_NOT_FOUND
+            return {"error":"Category doesn't exist."}, status.HTTP_404_NOT_FOUND
         query=board.query.filter_by(category=ctg.id).order_by(board.reg_date).all()
         result=many_returns(query)
         nick=[sq.author.nickname for sq in query]
@@ -395,13 +410,16 @@ class GetToken(Resource):   #로그인 시 access token, refresh token생성
         pw=args['pw']
         user=member.query.filter_by(id=id).first()
 
+        if user.undergrad_number == 0:
+            return {"error":"Student Mail Authentication Not Completed"}, status.HTTP_401_UNAUTHORIZED
         if not user or not user.verify_password(pw):
             return {"error":"User doesn't exist"}, status.HTTP_401_UNAUTHORIZED
         if not user.verify_password(pw):
             return {"error":"password invalid"}, status.HTTP_401_UNAUTHORIZED
-        access_token=create_access_token(identity=id)   #15분
-        refresh_token=create_refresh_token(identity=id) #30일
-
+        access_token=create_access_token(identity=id)   #1시간  
+        refresh_token=create_refresh_token(identity=id) #30일    
+        #config.py에서 변경하거나
+        #매개변수에 expires_delta=[datetime.timedelta object]로 설정할 수 있음
         return jsonify({'access_token':access_token, 'refresh_token':refresh_token})
 
 class RefreshToken(Resource):   #access token이 만료 되었을 때 refresh token을 이용하여 새 access token 발급
@@ -417,9 +435,13 @@ class TestResource(Resource):   #인증 테스트용. 나중에 삭제 바람
         claims=get_jwt_claims()
         return jsonify({claims[id]:claims[index]})
 
-class MailTest(Resource):
+class MailTest(Resource):       #메일 테스트용. 나중에 삭제 바람
     def get(self):
-        send_email("32131752@dankook.ac.kr","subjectsubject")
+        aaa={}
+        aaa['id']="asdf"
+        aaa['nickname']="nicknick"
+        aaa['email']="test@test.kr"
+        send_email("32131752@dankook.ac.kr",title,aaa)
 
 api.add_resource(UserResource,'/member')
 api.add_resource(ProfileResource,'/member/<int:idx>')
@@ -433,5 +455,7 @@ api.add_resource(ProfessorResource,'/professor/<int:idx>')
 
 api.add_resource(GetToken,'/token')
 api.add_resource(RefreshToken,'/refresh_token')
+api.add_resource(MailAuthentication,'/mailauth/<user_idx>')
+
 api.add_resource(TestResource,'/test')      #테스트 후 삭제 바람
-api.add_resource(MailTest,'/mail')
+api.add_resource(MailTest,'/mail')          #테스트 후 삭제 바람

@@ -1,4 +1,4 @@
-﻿18.05.22
+﻿18.05.27
 
 1. windows용 apache 구동은 python 2.7 혹은 python 3.4가 사용할 수 있는 최신버전입니다.
 
@@ -17,6 +17,7 @@
 3. apache에서 구동시 config.py에서 DEBUG=False로 설정,
    wsgi파일에서 path를 확인하시길 바랍니다.
 
+4. DB접속정보, JWT키, 메일계정 등 보안사항을 환경변수로 설정 
 <Routing>
 사용자등록, 전체 목록 : /member
 사용자 정보 변경, 삭제 : /member/<사용자 idx>
