@@ -1,6 +1,5 @@
 #-*- coding: utf-8 -*-
 #api.py
-
 '''
 HTTP Basic Auth에서
 JWT(JSON Web Token)인증으로 변경.
@@ -30,6 +29,7 @@ from flask import jsonify
 from flask_restful import Api,Resource,reqparse
 from models import *
 from auth import *
+from mail import send_email
 from sqlalchemy.exc import SQLAlchemyError
 import status
 from flask_jwt_extended import (create_access_token,
@@ -417,6 +417,10 @@ class TestResource(Resource):   #인증 테스트용. 나중에 삭제 바람
         claims=get_jwt_claims()
         return jsonify({claims[id]:claims[index]})
 
+class MailTest(Resource):
+    def get(self):
+        send_email("32131752@dankook.ac.kr","subjectsubject")
+
 api.add_resource(UserResource,'/member')
 api.add_resource(ProfileResource,'/member/<int:idx>')
 api.add_resource(CategoryResource,'/CategoryList')
@@ -430,3 +434,4 @@ api.add_resource(ProfessorResource,'/professor/<int:idx>')
 api.add_resource(GetToken,'/token')
 api.add_resource(RefreshToken,'/refresh_token')
 api.add_resource(TestResource,'/test')      #테스트 후 삭제 바람
+api.add_resource(MailTest,'/mail')
